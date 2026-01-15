@@ -107,23 +107,36 @@
       
       currentPage = pageNum;
       const page = await pdfDoc.getPage(pageNum);
-      const scale = 1.5;
-      const viewport = page.getViewport({ scale });
       
       const canvas = document.getElementById('pdf-canvas');
+      const container = document.getElementById('pdf-container');
+      
+      // ウィンドウサイズに合わせてスケールを計算
+      const maxWidth = container.clientWidth - 20;
+      const viewport = page.getViewport({ scale: 1 });
+      const scale = maxWidth / viewport.width;
+      const scaledViewport = page.getViewport({ scale });
+      
       const context = canvas.getContext('2d');
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
+      canvas.width = scaledViewport.width;
+      canvas.height = scaledViewport.height;
       
       await page.render({
         canvasContext: context,
-        viewport: viewport
+        viewport: scaledViewport
       }).promise;
       
       document.getElementById('current-page').textContent = pageNum;
       document.getElementById('prev-btn').disabled = pageNum === 1;
       document.getElementById('next-btn').disabled = pageNum === pdfDoc.numPages;
     }
+
+    // ウィンドウリサイズ時に再レンダリング
+    window.addEventListener('resize', () => {
+      if (pdfDoc) {
+        renderPage(currentPage);
+      }
+    });
 
     function nextPage() {
       if (currentPage < pdfDoc.numPages) {
