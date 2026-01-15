@@ -65,9 +65,11 @@
       justify-content: center;
       align-items: flex-start;
       background-color: #f0f0f0;
+      padding: 10px;
     }
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
       margin: 10px auto;
+      display: block;
     }
   </style>
 </head>
@@ -109,7 +111,7 @@
       const page = await pdfDoc.getPage(pageNum);
       
       const canvas = document.getElementById('pdf-canvas');
-      const container = document.getElementById('pdf-container');
+      const container = document.querySelector('.pdf-container');
       
       // ウィンドウサイズに合わせてスケールを計算
       const maxWidth = container.clientWidth - 20;
