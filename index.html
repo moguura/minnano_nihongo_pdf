@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PDF Viewer</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     body, html { 
       margin: 0; 
@@ -21,27 +22,122 @@
       width: 100%; 
       z-index: 1000;
       box-sizing: border-box;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    h2 {
+      margin: 0;
+      flex: 1;
+    }
+    .controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    button {
+      background-color: rgba(255, 255, 255, 0.2);
+      border: 1px solid white;
+      color: white;
+      padding: 5px 10px;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    button:hover {
+      background-color: rgba(255, 255, 255, 0.3);
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .page-info {
+      color: white;
+      font-size: 14px;
+      min-width: 100px;
+      text-align: right;
     }
     .pdf-container {
       margin-top: 50px; 
       height: calc(100vh - 50px);
+      overflow: auto;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      background-color: #f0f0f0;
     }
-    iframe { 
-      width: 100%; 
-      height: 100%; 
-      border: none; 
-    }
-    h2 {
-      margin: 0;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+      margin: 10px auto;
     }
   </style>
 </head>
 <body>
   <div class="header">
     <h2>PDF Viewer</h2>
+    <div class="controls">
+      <button id="prev-btn" onclick="prevPage()">← Previous</button>
+      <span class="page-info"><span id="current-page">1</span> / <span id="total-pages">0</span></span>
+      <button id="next-btn" onclick="nextPage()">Next →</button>
+    </div>
   </div>
   <div class="pdf-container">
-    <iframe src="https://github.com/moguura/minnano_nihongo_pdf/raw/main/L25tara_if.pdf" allowfullscreen></iframe>
+    <canvas id="pdf-canvas"></canvas>
   </div>
+
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    
+    const pdfUrl = 'https://moguura.github.io/minnano_nihongo_pdf/L25tara_if.pdf';
+    let pdfDoc = null;
+    let currentPage = 1;
+
+    async function loadPdf() {
+      try {
+        pdfDoc = await pdfjsLib.getDocument(pdfUrl).promise;
+        document.getElementById('total-pages').textContent = pdfDoc.numPages;
+        renderPage(currentPage);
+      } catch (error) {
+        console.error('PDF読み込みエラー:', error);
+        alert('PDFの読み込みに失敗しました。URLを確認してください。');
+      }
+    }
+
+    async function renderPage(pageNum) {
+      if (pageNum < 1 || pageNum > pdfDoc.numPages) return;
+      
+      currentPage = pageNum;
+      const page = await pdfDoc.getPage(pageNum);
+      const scale = 1.5;
+      const viewport = page.getViewport({ scale });
+      
+      const canvas = document.getElementById('pdf-canvas');
+      const context = canvas.getContext('2d');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      
+      await page.render({
+        canvasContext: context,
+        viewport: viewport
+      }).promise;
+      
+      document.getElementById('current-page').textContent = pageNum;
+      document.getElementById('prev-btn').disabled = pageNum === 1;
+      document.getElementById('next-btn').disabled = pageNum === pdfDoc.numPages;
+    }
+
+    function nextPage() {
+      if (currentPage < pdfDoc.numPages) {
+        renderPage(currentPage + 1);
+      }
+    }
+
+    function prevPage() {
+      if (currentPage > 1) {
+        renderPage(currentPage - 1);
+      }
+    }
+
+    loadPdf();
+  </script>
 </body>
 </html>
