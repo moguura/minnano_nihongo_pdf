@@ -153,9 +153,15 @@
       const scale = maxWidth / viewport.width;
       const scaledViewport = page.getViewport({ scale });
       
+      // 高 DPI 対応（スマホのぼやけ防止）
+      const dpr = window.devicePixelRatio || 1;
+      
       const context = canvas.getContext('2d');
-      canvas.width = scaledViewport.width;
-      canvas.height = scaledViewport.height;
+      canvas.width = scaledViewport.width * dpr;
+      canvas.height = scaledViewport.height * dpr;
+      canvas.style.width = scaledViewport.width + 'px';
+      canvas.style.height = scaledViewport.height + 'px';
+      context.scale(dpr, dpr);
       
       await page.render({
         canvasContext: context,
