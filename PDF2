@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF Viewer</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    body, html { 
+      margin: 0; 
+      padding: 0; 
+      height: 100%; 
+      overflow: hidden; 
+    }
+    .header {
+      background-color: #007bff; 
+      color: white; 
+      padding: 10px;
+      text-align: center; 
+      position: fixed; 
+      top: 0; 
+      width: 100%; 
+      z-index: 1000;
+      box-sizing: border-box;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    h2 {
+      margin: 0;
+      flex: 1;
+      font-size: 18px;
+    }
+    .controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    button {
+      background-color: rgba(255, 255, 255, 0.2);
+      border: 1px solid white;
+      color: white;
+      padding: 5px 10px;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+    button:hover {
+      background-color: rgba(255, 255, 255, 0.3);
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .page-info {
+      color: white;
+      font-size: 14px;
+      min-width: 100px;
+      text-align: center;
+    }
+    .pdf-container {
+      margin-top: 50px; 
+      height: calc(100vh - 50px);
+      overflow: auto;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      background-color: #f0f0f0;
+      padding: 10px;
+    }
+    #pdf-canvas {
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+      margin: 10px auto;
+      display: block;
+      max-width: 100%;
+      height: auto;
+    }
+    /* スマホ対応 */
+    @media (max-width: 768px) {
+      .header {
+        padding: 8px;
+      }
+      h2 {
+        font-size: 16px;
+      }
+      .controls {
+        gap: 5px;
+        width: 100%;
+        justify-content: center;
+        margin-top: 5px;
+      }
+      button {
+        padding: 3px 6px;
+        font-size: 11px;
+      }
+      .page-info {
+        font-size: 11px;
+        min-width: 70px;
+      }
+      .pdf-container {
+        margin-top: 80px;
+        height: calc(100vh - 80px);
+        padding: 5px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h2>PDF Viewer</h2>
+    <div class="controls">
+      <button id="prev-btn" onclick="prevPage()">← Previous</button>
+      <span class="page-info"><span id="current-page">1</span> / <span id="total-pages">0</span></span>
+      <button id="next-btn" onclick="nextPage()">Next →</button>
+    </div>
+  </div>
+  <div class="pdf-container">
+    <canvas id="pdf-canvas"></canvas>
+  </div>
+
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    
+    const pdfUrl = './L25tara_if.pdf';
+    let pdfDoc = null;
+    let currentPage = 1;
+
+    async function loadPdf() {
+      try {
+        pdfDoc = await pdfjsLib.getDocument(pdfUrl).promise;
+        document.getElementById('total-pages').textContent = pdfDoc.numPages;
+        renderPage(currentPage);
+      } catch (error) {
+        console.error('PDF読み込みエラー:', error);
+        alert('PDFの読み込みに失敗しました。URLを確認してください。');
+      }
+    }
+
+    async function renderPage(pageNum) {
+      if (pageNum < 1 || pageNum > pdfDoc.numPages) return;
+      
+      currentPage = pageNum;
+      const page = await pdfDoc.getPage(pageNum);
+      
+      const canvas = document.getElementById('pdf-canvas');
+      const container = document.querySelector('.pdf-container');
+      
+      // ウィンドウサイズに合わせてスケールを計算
+      const maxWidth = container.clientWidth - 20;
+      const viewport = page.getViewport({ scale: 1 });
+      const scale = maxWidth / viewport.width;
+      const scaledViewport = page.getViewport({ scale });
+      
+      // 高 DPI 対応（スマホのぼやけ防止）
+      const dpr = window.devicePixelRatio || 1;
+      
+      const context = canvas.getContext('2d');
+      canvas.width = scaledViewport.width * dpr;
+      canvas.height = scaledViewport.height * dpr;
+      canvas.style.width = scaledViewport.width + 'px';
+      canvas.style.height = scaledViewport.height + 'px';
+      context.scale(dpr, dpr);
+      
+      await page.render({
+        canvasContext: context,
+        viewport: scaledViewport
+      }).promise;
+      
+      document.getElementById('current-page').textContent = pageNum;
+      document.getElementById('prev-btn').disabled = pageNum === 1;
+      document.getElementById('next-btn').disabled = pageNum === pdfDoc.numPages;
+    }
+
+    // ウィンドウリサイズ時に再レンダリング
+    window.addEventListener('resize', () => {
+      if (pdfDoc) {
+        renderPage(currentPage);
+      }
+    });
+
+    function nextPage() {
+      if (currentPage < pdfDoc.numPages) {
+        renderPage(currentPage + 1);
+      }
+    }
+
+    function prevPage() {
+      if (currentPage > 1) {
+        renderPage(currentPage - 1);
+      }
+    }
+
+    loadPdf();
+  </script>
+</body>
+</html>
