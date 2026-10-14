@@ -125,6 +125,24 @@
         padding: 5px;
       }
     }
+/* 通常は案内を非表示 */
+.rotate-notice {
+  display: none;
+  flex-shrink: 0;
+}
+
+/* スマホが縦向きのときだけ案内を表示 */
+@media (max-width: 768px) and (orientation: portrait) {
+  .rotate-notice {
+    display: block;
+    background-color: #fff3cd;
+    color: #856404;
+    text-align: center;
+    padding: 10px;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+}
   </style>
 </head>
 
@@ -149,6 +167,11 @@
     </div>
   </div>
 
+  <div class="rotate-notice">
+  📱 For a larger view, please turn your phone sideways.<br>
+  If the screen doesn't rotate, please enable auto-rotate in your phone's settings.
+  </div>
+  
   <div class="pdf-container">
     <canvas id="pdf-canvas"></canvas>
   </div>
