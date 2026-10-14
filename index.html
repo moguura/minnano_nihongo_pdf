@@ -1,42 +1,54 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0">
   <title>PDF Viewer</title>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
   <style>
-    body, html { 
-      margin: 0; 
-      padding: 0; 
-      height: 100%; 
-      overflow: hidden; 
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
     }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      height: 100dvh;
+    }
+
     .header {
-      background-color: #007bff; 
-      color: white; 
+      background-color: #007bff;
+      color: white;
       padding: 10px;
-      text-align: center; 
-      position: fixed; 
-      top: 0; 
-      width: 100%; 
-      z-index: 1000;
       box-sizing: border-box;
       display: flex;
       justify-content: space-between;
       align-items: center;
       flex-wrap: wrap;
+      gap: 8px;
+      flex-shrink: 0;
     }
+
     h2 {
       margin: 0;
-      flex: 1;
       font-size: 18px;
     }
+
     .controls {
       display: flex;
       gap: 10px;
       align-items: center;
     }
+
     button {
       background-color: rgba(255, 255, 255, 0.2);
       border: 1px solid white;
@@ -47,150 +59,266 @@
       font-size: 14px;
       white-space: nowrap;
     }
+
     button:hover {
       background-color: rgba(255, 255, 255, 0.3);
     }
+
     button:disabled {
       opacity: 0.5;
       cursor: not-allowed;
     }
+
     .page-info {
       color: white;
       font-size: 14px;
-      min-width: 100px;
+      min-width: 70px;
       text-align: center;
     }
+
+    /* PDFを表示する領域 */
     .pdf-container {
-      margin-top: 50px; 
-      height: calc(100vh - 50px);
+      flex: 1;
+      min-height: 0;
+      min-width: 0;
+      box-sizing: border-box;
       overflow: auto;
       display: flex;
       justify-content: center;
-      align-items: flex-start;
+      align-items: center;
       background-color: #f0f0f0;
       padding: 10px;
     }
+
     #pdf-canvas {
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
-      margin: 10px auto;
       display: block;
-      max-width: 100%;
-      height: auto;
+      flex-shrink: 0;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
     }
-    /* スマホ対応 */
+
+    /* スマートフォン対応 */
     @media (max-width: 768px) {
       .header {
         padding: 8px;
       }
+
       h2 {
         font-size: 16px;
       }
+
       .controls {
         gap: 5px;
         width: 100%;
         justify-content: center;
-        margin-top: 5px;
       }
+
       button {
         padding: 3px 6px;
         font-size: 11px;
       }
+
       .page-info {
         font-size: 11px;
-        min-width: 70px;
+        min-width: 60px;
       }
+
       .pdf-container {
-        margin-top: 80px;
-        height: calc(100vh - 80px);
         padding: 5px;
       }
     }
   </style>
 </head>
+
 <body>
   <div class="header">
     <h2>PDF Viewer</h2>
+
     <div class="controls">
-      <button id="prev-btn" onclick="prevPage()">← Previous</button>
-      <span class="page-info"><span id="current-page">1</span> / <span id="total-pages">0</span></span>
-      <button id="next-btn" onclick="nextPage()">Next →</button>
+      <button id="prev-btn" onclick="prevPage()">
+        ← Previous
+      </button>
+
+      <span class="page-info">
+        <span id="current-page">1</span>
+        /
+        <span id="total-pages">0</span>
+      </span>
+
+      <button id="next-btn" onclick="nextPage()">
+        Next →
+      </button>
     </div>
   </div>
+
   <div class="pdf-container">
     <canvas id="pdf-canvas"></canvas>
   </div>
 
   <script>
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
     const pdfUrl = './L25_Kaiwa.pdf';
+
     let pdfDoc = null;
     let currentPage = 1;
+    let isRendering = false;
+    let renderAgain = false;
 
     async function loadPdf() {
       try {
         pdfDoc = await pdfjsLib.getDocument(pdfUrl).promise;
-        document.getElementById('total-pages').textContent = pdfDoc.numPages;
-        renderPage(currentPage);
+
+        document.getElementById('total-pages')
+          .textContent = pdfDoc.numPages;
+
+        updateControls();
+        renderPage();
+
       } catch (error) {
         console.error('PDF読み込みエラー:', error);
         alert('PDFの読み込みに失敗しました。URLを確認してください。');
       }
     }
 
-    async function renderPage(pageNum) {
-      if (pageNum < 1 || pageNum > pdfDoc.numPages) return;
-      
-      currentPage = pageNum;
-      const page = await pdfDoc.getPage(pageNum);
-      
-      const canvas = document.getElementById('pdf-canvas');
-      const container = document.querySelector('.pdf-container');
-      
-      // ウィンドウサイズに合わせてスケールを計算
-      const maxWidth = container.clientWidth - 20;
-      const viewport = page.getViewport({ scale: 1 });
-      const scale = maxWidth / viewport.width;
-      const scaledViewport = page.getViewport({ scale });
-      
-      // 高 DPI 対応（スマホのぼやけ防止）
-      const dpr = window.devicePixelRatio || 1;
-      
-      const context = canvas.getContext('2d');
-      canvas.width = scaledViewport.width * dpr;
-      canvas.height = scaledViewport.height * dpr;
-      canvas.style.width = scaledViewport.width + 'px';
-      canvas.style.height = scaledViewport.height + 'px';
-      context.scale(dpr, dpr);
-      
-      await page.render({
-        canvasContext: context,
-        viewport: scaledViewport
-      }).promise;
-      
-      document.getElementById('current-page').textContent = pageNum;
-      document.getElementById('prev-btn').disabled = pageNum === 1;
-      document.getElementById('next-btn').disabled = pageNum === pdfDoc.numPages;
+    function updateControls() {
+      document.getElementById('current-page')
+        .textContent = currentPage;
+
+      document.getElementById('prev-btn')
+        .disabled = currentPage === 1;
+
+      document.getElementById('next-btn')
+        .disabled = currentPage === pdfDoc.numPages;
     }
 
-    // ウィンドウリサイズ時に再レンダリング
-    window.addEventListener('resize', () => {
-      if (pdfDoc) {
-        renderPage(currentPage);
+    async function renderPage() {
+      if (!pdfDoc) return;
+
+      // 描画中にページ変更やサイズ変更があった場合
+      if (isRendering) {
+        renderAgain = true;
+        return;
       }
-    });
+
+      isRendering = true;
+
+      try {
+        do {
+          renderAgain = false;
+
+          const pageNum = currentPage;
+          const page = await pdfDoc.getPage(pageNum);
+
+          if (pageNum !== currentPage) {
+            renderAgain = true;
+            continue;
+          }
+
+          const canvas =
+            document.getElementById('pdf-canvas');
+
+          const container =
+            document.querySelector('.pdf-container');
+
+          const style = getComputedStyle(container);
+
+          // 表示領域の横幅を計算
+          const availableWidth = Math.max(
+            1,
+            container.clientWidth
+              - parseFloat(style.paddingLeft)
+              - parseFloat(style.paddingRight)
+              - 2
+          );
+
+          // 表示領域の縦幅を計算
+          const availableHeight = Math.max(
+            1,
+            container.clientHeight
+              - parseFloat(style.paddingTop)
+              - parseFloat(style.paddingBottom)
+              - 2
+          );
+
+          // PDF本来のサイズ
+          const viewport = page.getViewport({
+            scale: 1
+          });
+
+          // ★ 横幅・縦幅の両方に収まる倍率を選択
+          const scale = Math.min(
+            availableWidth / viewport.width,
+            availableHeight / viewport.height
+          );
+
+          const scaledViewport = page.getViewport({
+            scale: scale
+          });
+
+          // 高解像度ディスプレイ対応
+          const dpr = Math.min(
+            window.devicePixelRatio || 1, 2
+          );
+
+          const context = canvas.getContext('2d');
+
+          canvas.width =
+            Math.round(scaledViewport.width * dpr);
+
+          canvas.height =
+            Math.round(scaledViewport.height * dpr);
+
+          canvas.style.width =
+            scaledViewport.width + 'px';
+
+          canvas.style.height =
+            scaledViewport.height + 'px';
+
+          context.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+          await page.render({
+            canvasContext: context,
+            viewport: scaledViewport
+          }).promise;
+
+        } while (renderAgain || pageNumChanged());
+
+      } catch (error) {
+        console.error('PDF描画エラー:', error);
+      } finally {
+        isRendering = false;
+      }
+    }
+
+    // 現在のページ番号は描画要求時に更新されるため、
+    // 再描画が必要な場合はrenderAgainで管理する
+    function pageNumChanged() {
+      return renderAgain;
+    }
 
     function nextPage() {
-      if (currentPage < pdfDoc.numPages) {
-        renderPage(currentPage + 1);
+      if (pdfDoc && currentPage < pdfDoc.numPages) {
+        currentPage++;
+        updateControls();
+        renderPage();
       }
     }
 
     function prevPage() {
-      if (currentPage > 1) {
-        renderPage(currentPage - 1);
+      if (pdfDoc && currentPage > 1) {
+        currentPage--;
+        updateControls();
+        renderPage();
       }
     }
+
+    // ウィンドウサイズ変更時に再描画
+    window.addEventListener('resize', () => {
+      if (pdfDoc) {
+        renderPage();
+      }
+    });
 
     loadPdf();
   </script>
