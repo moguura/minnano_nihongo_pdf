@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0">
+  <title>PDF Viewer</title>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      height: 100dvh;
+    }
+
+    /* ヘッダー */
+    .header {
+      background-color: #007bff;
+      color: white;
+      padding: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: nowrap;
+      white-space: nowrap;
+    }
+
+    button {
+      background-color: rgba(255,255,255,0.2);
+      border: 1px solid white;
+      color: white;
+      padding: 5px 10px;
+      cursor: pointer;
+      border-radius: 4px;
+      font-size: 14px;
+      white-space: nowrap;
+    }
+
+    button:hover {
+      background-color: rgba(255,255,255,0.3);
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .page-info {
+      color: white;
+      font-size: 14px;
+      min-width: 70px;
+      text-align: center;
+    }
+
+    /* PDF表示領域 */
+    .pdf-container {
+      flex: 1;
+      min-height: 0;
+      min-width: 0;
+      overflow: auto;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-color: #f0f0f0;
+      padding: 10px;
+    }
+
+    #pdf-canvas {
+      display: block;
+      flex-shrink: 0;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    }
+
+    /* 回転案内は通常非表示 */
+    .rotate-notice {
+      display: none;
+      flex-shrink: 0;
+    }
+
+    /* =================================
+       スマホ縦向き
+       ================================= */
+    @media (max-width: 768px)
+           and (orientation: portrait) {
+
+      .header {
+        padding: 8px;
+      }
+
+      h2 {
+        font-size: 16px;
+        width: 100%;
+      }
+
+      .controls {
+        width: 100%;
+        justify-content: center;
+        gap: 5px;
+      }
+
+      button {
+        padding: 3px 6px;
+        font-size: 11px;
+      }
+
+      .page-info {
+        font-size: 11px;
+        min-width: 60px;
+      }
+
+      .rotate-notice {
+        display: block;
+        background-color: #fff3cd;
+        color: #856404;
+        text-align: center;
+        padding: 10px;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      .pdf-container {
+        padding: 5px;
+      }
+    }
+
+    /* =================================
+       スマホ横向き
+       タイトルを消して操作部分を1行に
+       ================================= */
+    @media (orientation: landscape)
+           and (max-width: 1100px) {
+
+      .header {
+        padding: 3px 6px;
+        flex-wrap: nowrap;
+        justify-content: center;
+        gap: 0;
+      }
+
+      /* PDF Viewerのタイトルを消す */
+      .header h2 {
+        display: none;
+      }
+
+      .controls {
+        width: auto;
+        flex-shrink: 0;
+        justify-content: center;
+        gap: 8px;
+        margin: 0;
+      }
+
+      /* ページ送りボタンを小さくする */
+      button {
+        padding: 2px 10px;
+        font-size: 14px;
+        line-height: 1.2;
+        min-width: 36px;
+      }
+
+      /* Previous、Nextの文字を消す */
+      .button-text {
+        display: none;
+      }
+
+      .page-info {
+        font-size: 12px;
+        min-width: 60px;
+      }
+
+      .rotate-notice {
+        display: none;
+      }
+
+      /* PDFの表示領域を最大限確保 */
+      .pdf-container {
+        padding: 2px;
+      }
+    }
+
+  </style>
+</head>
+
+<body>
+
+  <div class="header">
+    <h2>PDF Viewer</h2>
+
+    <div class="controls">
+
+      <button id="prev-btn"
+              onclick="prevPage()"
+              aria-label="Previous page">
+        ←<span class="button-text"> Previous</span>
+      </button>
+
+      <span class="page-info">
+        <span id="current-page">1</span>
+        /
+        <span id="total-pages">0</span>
+      </span>
+
+      <button id="next-btn"
+              onclick="nextPage()"
+              aria-label="Next page">
+        <span class="button-text">Next </span>→
+      </button>
+
+    </div>
+  </div>
+
+  <!-- スマホ縦向きの案内 -->
+  <div class="rotate-notice">
+    📱 For a larger view, please turn your phone sideways.
+    <br>
+    If the screen doesn't rotate, please enable
+    auto-rotate in your phone's settings.
+  </div>
+
+  <!-- PDF表示 -->
+  <div class="pdf-container">
+    <canvas id="pdf-canvas"></canvas>
+  </div>
+
+  <script>
+
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    const pdfUrl = './L28_Kaiwa_role play.pdf';
+
+    let pdfDoc = null;
+    let currentPage = 1;
+
+    let isRendering = false;
+    let renderAgain = false;
+
+    // PDF読み込み
+    async function loadPdf() {
+      try {
+        pdfDoc = await pdfjsLib.getDocument(pdfUrl).promise;
+
+        document.getElementById('total-pages')
+          .textContent = pdfDoc.numPages;
+
+        updateControls();
+        renderPage();
+
+      } catch (error) {
+        console.error('PDF読み込みエラー:', error);
+        alert('PDFの読み込みに失敗しました。');
+      }
+    }
+
+    // ページ番号とボタンの状態
+    function updateControls() {
+
+      document.getElementById('current-page')
+        .textContent = currentPage;
+
+      document.getElementById('prev-btn')
+        .disabled = currentPage === 1;
+
+      document.getElementById('next-btn')
+        .disabled = currentPage === pdfDoc.numPages;
+    }
+
+    // PDF描画
+    async function renderPage() {
+
+      if (!pdfDoc) return;
+
+      // 描画中の再描画要求を記録
+      if (isRendering) {
+        renderAgain = true;
+        return;
+      }
+
+      isRendering = true;
+
+      try {
+
+        do {
+          renderAgain = false;
+
+          const pageNum = currentPage;
+          const page = await pdfDoc.getPage(pageNum);
+
+          // 読み込み中にページが変わった場合
+          if (pageNum !== currentPage) {
+            renderAgain = true;
+            continue;
+          }
+
+          const canvas =
+            document.getElementById('pdf-canvas');
+
+          const container =
+            document.querySelector('.pdf-container');
+
+          const style = getComputedStyle(container);
+
+          // 表示可能な横幅
+          const availableWidth = Math.max(
+            1,
+            container.clientWidth
+              - parseFloat(style.paddingLeft)
+              - parseFloat(style.paddingRight)
+              - 4
+          );
+
+          // 表示可能な縦幅
+          const availableHeight = Math.max(
+            1,
+            container.clientHeight
+              - parseFloat(style.paddingTop)
+              - parseFloat(style.paddingBottom)
+              - 4
+          );
+
+          // PDF本来のサイズ
+          const originalViewport =
+            page.getViewport({ scale: 1 });
+
+          // 横幅・縦幅の両方に収まる倍率
+          const scale = Math.min(
+            availableWidth / originalViewport.width,
+            availableHeight / originalViewport.height
+          );
+
+          const viewport =
+            page.getViewport({ scale: scale });
+
+          // 高解像度ディスプレイ対応
+          const dpr = Math.min(
+            window.devicePixelRatio || 1, 2
+          );
+
+          canvas.width =
+            Math.round(viewport.width * dpr);
+
+          canvas.height =
+            Math.round(viewport.height * dpr);
+
+          canvas.style.width =
+            viewport.width + 'px';
+
+          canvas.style.height =
+            viewport.height + 'px';
+
+          const context = canvas.getContext('2d');
+
+          context.setTransform(
+            dpr, 0, 0, dpr, 0, 0
+          );
+
+          await page.render({
+            canvasContext: context,
+            viewport: viewport
+          }).promise;
+
+        } while (renderAgain);
+
+      } catch (error) {
+        console.error('PDF描画エラー:', error);
+
+      } finally {
+        isRendering = false;
+      }
+    }
+
+    // 次のページ
+    function nextPage() {
+      if (pdfDoc && currentPage < pdfDoc.numPages) {
+        currentPage++;
+        updateControls();
+        renderPage();
+      }
+    }
+
+    // 前のページ
+    function prevPage() {
+      if (pdfDoc && currentPage > 1) {
+        currentPage--;
+        updateControls();
+        renderPage();
+      }
+    }
+
+    // 画面サイズ変更時の再描画
+    window.addEventListener('resize', () => {
+      if (pdfDoc) {
+        renderPage();
+      }
+    });
+
+    // PDF表示領域のサイズ変化も検知
+    const resizeObserver = new ResizeObserver(() => {
+      if (pdfDoc) {
+        renderPage();
+      }
+    });
+
+    resizeObserver.observe(
+      document.querySelector('.pdf-container')
+    );
+
+    // 開始
+    loadPdf();
+
+  </script>
+
+</body>
+</html>
